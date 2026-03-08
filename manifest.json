@@ -1,15 +1,15 @@
 {
   "name": "MiniBlox Replay Mod",
   "version": "1.0",
-  "description": "Replay Mod for miniblox.io with freelook",
+  "description": "Replay mod with spectator camera for miniblox.io",
   "manifest_version": 3,
-  "permissions": ["scripting", "tabs"],
+  "permissions": ["scripting"],
   "host_permissions": ["https://miniblox.io/*"],
   "content_scripts": [
     {
       "matches": ["https://miniblox.io/*"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "icons": {
