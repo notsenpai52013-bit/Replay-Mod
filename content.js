@@ -1,239 +1,198 @@
-let isRecording = false
-let mediaRecorder = null
-let recordedChunks = []
-let recordings = []
+let recording = false
+let replayFrames = []
+let replayPlaying = false
+let replayIndex = 0
 
-let freelook = false
-
-document.addEventListener("keydown", e=>{
-if(e.code==="AltRight"){
-freelook=true
+let spectator = {
+    pos:{x:0,y:0,z:0},
+    yaw:0,
+    pitch:0,
+    speed:0.6
 }
+
+function recordFrame(){
+
+    if(!recording) return
+    if(!window.game || !game.player) return
+
+    replayFrames.push({
+        time: Date.now(),
+        x: game.player.pos.x,
+        y: game.player.pos.y,
+        z: game.player.pos.z,
+        yaw: controls.yaw,
+        pitch: controls.pitch
+    })
+
+}
+
+setInterval(recordFrame,50)
+
+function startRecording(){
+
+    replayFrames=[]
+    recording=true
+    alert("Replay recording started")
+
+}
+
+function stopRecording(){
+
+    recording=false
+
+    const replayData={
+        version:1,
+        frames:replayFrames
+    }
+
+    const blob=new Blob([JSON.stringify(replayData)],{type:"application/json"})
+    const url=URL.createObjectURL(blob)
+
+    const a=document.createElement("a")
+    a.href=url
+    a.download="miniblox-replay.json"
+    a.click()
+
+    URL.revokeObjectURL(url)
+
+}
+
+function loadReplay(file){
+
+    const reader=new FileReader()
+
+    reader.onload=e=>{
+
+        const data=JSON.parse(e.target.result)
+
+        replayFrames=data.frames
+        startReplay()
+
+    }
+
+    reader.readAsText(file)
+
+}
+
+function startReplay(){
+
+    replayPlaying=true
+    replayIndex=0
+
+    if(!window.controls) return
+
+    controls.setFreeCamMode(true)
+
+    spectator.pos.x=replayFrames[0].x
+    spectator.pos.y=replayFrames[0].y
+    spectator.pos.z=replayFrames[0].z
+
+}
+
+function updateReplay(){
+
+    if(!replayPlaying) return
+    if(replayIndex>=replayFrames.length){
+        replayPlaying=false
+        return
+    }
+
+    const frame=replayFrames[replayIndex]
+
+    controls.camera.position.set(
+        spectator.pos.x,
+        spectator.pos.y,
+        spectator.pos.z
+    )
+
+    replayIndex++
+
+}
+
+setInterval(updateReplay,50)
+
+document.addEventListener("keydown",e=>{
+
+    if(!replayPlaying) return
+
+    const forward={x:Math.sin(spectator.yaw),z:Math.cos(spectator.yaw)}
+
+    if(e.code==="KeyW"){
+        spectator.pos.x+=forward.x*spectator.speed
+        spectator.pos.z+=forward.z*spectator.speed
+    }
+
+    if(e.code==="KeyS"){
+        spectator.pos.x-=forward.x*spectator.speed
+        spectator.pos.z-=forward.z*spectator.speed
+    }
+
+    if(e.code==="KeyA"){
+        spectator.pos.x+=forward.z*spectator.speed
+        spectator.pos.z-=forward.x*spectator.speed
+    }
+
+    if(e.code==="KeyD"){
+        spectator.pos.x-=forward.z*spectator.speed
+        spectator.pos.z+=forward.x*spectator.speed
+    }
+
+    if(e.code==="Space") spectator.pos.y+=spectator.speed
+    if(e.code==="ShiftLeft") spectator.pos.y-=spectator.speed
+
 })
 
-document.addEventListener("keyup", e=>{
-if(e.code==="AltRight"){
-freelook=false
-}
-})
+function createLobbyMenu(){
 
-function getCanvas(){
-const canvases=[...document.querySelectorAll("canvas")]
-if(!canvases.length) return null
-return canvases.reduce((a,b)=>a.width*a.height>b.width*b.height?a:b)
-}
+    const menu=document.querySelector(".chakra-stack.css-1q5zbtn")
 
-function startRecording(btn){
+    if(!menu) return
 
-const canvas=getCanvas()
+    if(document.getElementById("replay-menu")) return
 
-if(!canvas){
-alert("Join a game first")
-return
-}
+    const btn=document.createElement("button")
+    btn.id="replay-menu"
+    btn.textContent="Replay Mod"
 
-const stream=canvas.captureStream(60)
+    btn.style.padding="10px"
+    btn.style.margin="5px"
 
-mediaRecorder=new MediaRecorder(stream)
+    btn.onclick=()=>{
 
-recordedChunks=[]
+        const panel=document.createElement("div")
 
-mediaRecorder.ondataavailable=e=>{
-if(e.data.size>0) recordedChunks.push(e.data)
-}
+        panel.style.position="fixed"
+        panel.style.top="50%"
+        panel.style.left="50%"
+        panel.style.transform="translate(-50%,-50%)"
+        panel.style.background="black"
+        panel.style.padding="20px"
+        panel.style.zIndex="999999"
 
-mediaRecorder.onstop=()=>{
+        const startBtn=document.createElement("button")
+        startBtn.textContent="Start Recording"
+        startBtn.onclick=startRecording
 
-const blob=new Blob(recordedChunks,{type:"video/webm"})
+        const stopBtn=document.createElement("button")
+        stopBtn.textContent="Stop & Download"
+        stopBtn.onclick=stopRecording
 
-recordings.push({
-id:Date.now(),
-blob:blob,
-date:new Date()
-})
+        const upload=document.createElement("input")
+        upload.type="file"
+        upload.onchange=e=>loadReplay(e.target.files[0])
 
-alert("Replay saved!")
-}
+        panel.appendChild(startBtn)
+        panel.appendChild(document.createElement("br"))
+        panel.appendChild(stopBtn)
+        panel.appendChild(document.createElement("br"))
+        panel.appendChild(upload)
 
-mediaRecorder.start()
+        document.body.appendChild(panel)
 
-isRecording=true
+    }
 
-btn.textContent="⏺ Recording"
-btn.style.background="red"
-}
-
-function stopRecording(btn){
-
-if(mediaRecorder) mediaRecorder.stop()
-
-isRecording=false
-
-btn.textContent="Replay Mod"
-btn.style.background=""
-}
-
-function downloadRecording(blob,id){
-
-const url=URL.createObjectURL(blob)
-
-const a=document.createElement("a")
-
-a.href=url
-a.download="replay-"+id+".webm"
-
-a.click()
-
-setTimeout(()=>URL.revokeObjectURL(url),2000)
-}
-
-function openReplayMenu(){
-
-const overlay=document.createElement("div")
-
-overlay.style=`
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.9);
-z-index:999999;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-`
-
-const title=document.createElement("h1")
-title.textContent="Replay Recordings"
-title.style="color:white;font-family:sans-serif"
-
-overlay.appendChild(title)
-
-const list=document.createElement("div")
-list.style="width:400px;max-height:300px;overflow:auto"
-
-recordings.forEach(r=>{
-
-const item=document.createElement("div")
-
-item.style=`
-padding:10px;
-background:#333;
-margin:5px;
-color:white;
-cursor:pointer;
-`
-
-item.textContent="Replay "+r.id
-
-item.onclick=()=>playReplay(r.blob)
-
-list.appendChild(item)
-
-})
-
-overlay.appendChild(list)
-
-const close=document.createElement("button")
-close.textContent="Close"
-close.onclick=()=>overlay.remove()
-
-overlay.appendChild(close)
-
-document.body.appendChild(overlay)
+    menu.appendChild(btn)
 
 }
 
-function playReplay(blob){
-
-const url=URL.createObjectURL(blob)
-
-const overlay=document.createElement("div")
-
-overlay.style=`
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:black;
-z-index:999999;
-display:flex;
-align-items:center;
-justify-content:center;
-`
-
-const video=document.createElement("video")
-
-video.src=url
-video.controls=true
-video.autoplay=true
-
-video.style="width:80%"
-
-overlay.appendChild(video)
-
-const close=document.createElement("button")
-
-close.textContent="X"
-close.style="position:absolute;top:20px;right:20px"
-
-close.onclick=()=>{
-video.pause()
-overlay.remove()
-}
-
-overlay.appendChild(close)
-
-document.body.appendChild(overlay)
-
-}
-
-function addButtons(){
-
-const menu=document.body
-
-if(document.getElementById("replayBtn")) return
-
-const recordBtn=document.createElement("button")
-
-recordBtn.id="replayBtn"
-
-recordBtn.textContent="Replay Mod"
-
-recordBtn.style=`
-position:fixed;
-bottom:20px;
-left:20px;
-z-index:99999;
-padding:10px;
-`
-
-recordBtn.onclick=()=>{
-if(isRecording) stopRecording(recordBtn)
-else startRecording(recordBtn)
-}
-
-document.body.appendChild(recordBtn)
-
-const viewBtn=document.createElement("button")
-
-viewBtn.textContent="Replays"
-
-viewBtn.style=`
-position:fixed;
-bottom:60px;
-left:20px;
-z-index:99999;
-padding:10px;
-`
-
-viewBtn.onclick=openReplayMenu
-
-document.body.appendChild(viewBtn)
-
-}
-
-setInterval(addButtons,2000)
+setInterval(createLobbyMenu,2000)
