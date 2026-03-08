@@ -1,0 +1,20 @@
+{
+  "name": "MiniBlox Replay Mod",
+  "version": "1.0",
+  "description": "Replay Mod for miniblox.io with freelook",
+  "manifest_version": 3,
+  "permissions": ["scripting", "tabs"],
+  "host_permissions": ["https://miniblox.io/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://miniblox.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
